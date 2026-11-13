@@ -63,12 +63,17 @@ fun GlowPanel(
 ) {
     val l = LocalLook.current
     val shape = RoundedCornerShape(l.radius)
+    // El contenido va recortado con un radio interior (radio - grosor) y separado del borde
+    // por el grosor del borde, para que las esquinas no se vean dobles.
+    val inner = RoundedCornerShape((l.radius - l.border).coerceAtLeast(0.dp))
     Box(
         modifier
             .glow(l.accent, 26.dp, l.radius, l.glow)
             .clip(shape)
             .background(l.panel)
             .border(l.border, l.accent, shape)
+            .padding(l.border)
+            .clip(inner)
     ) {
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -90,7 +95,7 @@ fun GlowPanel(
             if (footer != null) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(l.line))
                 Row(
-                    Modifier.fillMaxWidth().height(34.dp).background(Color(0x40000000)).padding(horizontal = 14.dp),
+                    Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = footer
                 )

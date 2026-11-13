@@ -42,11 +42,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import cr.andres.l200dash.data.AppsRepo
 import cr.andres.l200dash.data.CameraFeed
+import cr.andres.l200dash.data.Dashcam
 import cr.andres.l200dash.data.FeedState
 import cr.andres.l200dash.data.Prefs
 
 /** Etiquetas de las entradas de cámara de esta pantalla (según el diagnóstico). */
 fun cameraLabel(id: String): String = when (id) {
+    "dash" -> "Dashcam"
     "1" -> "Reversa"
     "0" -> "AHD 0"
     "2" -> "AHD 2"
@@ -54,11 +56,12 @@ fun cameraLabel(id: String): String = when (id) {
 }
 
 @Composable
-fun CameraPanel(modifier: Modifier = Modifier) {
+fun CameraPanel(modifier: Modifier = Modifier, onOpenDashcam: () -> Unit = {}, videoAllowed: Boolean = true) {
     val l = LocalLook.current
-    val ctx = LocalContext.current
     val cameraId by Prefs.cameraId.collectAsState()
+    val dash by Dashcam.state.collectAsState()
     var state by remember { mutableStateOf(FeedState.CONNECTING) }
+    val isDash = cameraId == "dash"
 
     GlowPanel(
         title = "Cámara",
@@ -66,37 +69,64 @@ fun CameraPanel(modifier: Modifier = Modifier) {
         modifier = modifier,
         tag = cameraLabel(cameraId) + " ▸",
         onTag = {
-            val ids = listOf("1", "0", "2")
+            val ids = listOf("dash", "1", "0", "2")
             Prefs.setCameraId(ids[(ids.indexOf(cameraId) + 1) % ids.size])
         },
         footer = {
-            Text(
-                when (state) {
-                    FeedState.LIVE -> "Señal OK"
-                    FeedState.NO_SIGNAL -> "Sin señal"
-                    FeedState.BUSY -> "En uso por el sistema"
-                    else -> "Conectando…"
-                },
-                color = l.dim, fontSize = 12.sp
-            )
+            if (isDash) {
+                Text(
+                    when {
+                        !dash.connected -> dash.message
+                        dash.recording -> "● Grabando" + if (dash.sdPresent) " · SD" else " · sin SD"
+                        else -> "En pausa" + if (dash.sdPresent) " · SD" else " · sin SD"
+                    },
+                    color = if (dash.recording) l.rec else l.dim, fontSize = 12.sp
+                )
+            } else {
+                Text(
+                    when (state) {
+                        FeedState.LIVE -> "Señal OK"
+                        FeedState.NO_SIGNAL -> "Sin señal"
+                        FeedState.BUSY -> "En uso por el sistema"
+                        else -> "Conectando…"
+                    },
+                    color = l.dim, fontSize = 12.sp
+                )
+            }
             Spacer(Modifier.weight(1f))
-            Text(
-                "Abrir dashcam ›",
-                color = l.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clip(RoundedCornerShape(6.dp)).combinedClickableCompat({ AppsRepo.launch(ctx, "com.fvision.camera") }, null).padding(4.dp)
-            )
+            if (isDash) {
+                Text(
+                    "Pantalla completa ›",
+                    color = l.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).combinedClickableCompat(onOpenDashcam, null).padding(4.dp)
+                )
+            }
         }
     ) {
-        key(cameraId) {
-            CameraView(
-                cameraId = cameraId,
-                onState = { state = it },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black)
-            )
+        val videoMod = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .padding(start = 10.dp, end = 10.dp, bottom = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black)
+        if (isDash) {
+            if (videoAllowed) {
+                Box(videoMod.combinedClickableCompat(onOpenDashcam, null)) { DashcamVideo(Modifier.fillMaxSize()) }
+            } else {
+                Box(videoMod, contentAlignment = Alignment.Center) { Text("En pantalla completa", color = l.dim, fontSize = 13.sp) }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlineButton("Foto", Modifier.weight(1f), enabled = dash.commandsReady) { Dashcam.takePhoto() }
+                OutlineButton(if (dash.locked) "Protegido" else "Guardar clip", Modifier.weight(1f), filled = dash.locked, enabled = dash.commandsReady) { Dashcam.toggleLock() }
+                OutlineButton(if (dash.muted) "Mic off" else "Mic", Modifier.weight(1f), enabled = dash.commandsReady) { Dashcam.toggleMute() }
+            }
+        } else {
+            key(cameraId) {
+                CameraView(cameraId = cameraId, onState = { state = it }, modifier = videoMod.padding(bottom = 2.dp))
+            }
         }
     }
 }

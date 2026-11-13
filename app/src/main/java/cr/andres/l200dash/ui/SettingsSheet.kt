@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import cr.andres.l200dash.data.DashStyle
 import cr.andres.l200dash.data.DayNightMode
 import cr.andres.l200dash.data.StyleRepo
+import cr.andres.l200dash.data.HomeRepo
 import java.io.File
 
 /**
@@ -144,6 +145,25 @@ fun SettingsSheet(currentlyNight: Boolean, onClose: () -> Unit, modifier: Modifi
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlineButton("Elegir imagen…", Modifier.weight(1f)) { picker.launch("image/*") }
                 OutlineButton("Usar la L200", Modifier.weight(1f), enabled = s.image != null) { edit { it.copy(image = null) } }
+            }
+
+            Section("Cuadrícula del inicio")
+            val home by HomeRepo.layout.collectAsState()
+            LabeledSlider("Columnas", home.cols.toFloat(), 8f..16f, "${home.cols}") { v -> HomeRepo.setGrid(v.toInt(), home.rows) }
+            LabeledSlider("Filas", home.rows.toFloat(), 5f..10f, "${home.rows}") { v -> HomeRepo.setGrid(home.cols, v.toInt()) }
+            Text("Para mover o agregar piezas: mantén presionado cualquier lugar del inicio.", color = l.dim, fontSize = 12.sp)
+            Spacer(Modifier.height(6.dp))
+            OutlineButton("Restablecer distribución original", Modifier.fillMaxWidth()) { HomeRepo.resetLayout() }
+
+            Section("Permisos")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlineButton("Acceso a la música", Modifier.weight(1f)) { openNotificationAccess(ctx) }
+                OutlineButton("Pantalla dividida", Modifier.weight(1f)) {
+                    try {
+                        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (_: Exception) {
+                    }
+                }
             }
 
             Section("Mis temas")

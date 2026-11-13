@@ -2,6 +2,9 @@ package cr.andres.l200dash
 
 import android.app.Application
 import cr.andres.l200dash.data.AppsRepo
+import cr.andres.l200dash.data.Dashcam
+import cr.andres.l200dash.data.HomeRepo
+import cr.andres.l200dash.data.WidgetHost
 import cr.andres.l200dash.data.Prefs
 import cr.andres.l200dash.data.StyleRepo
 import org.osmdroid.config.Configuration
@@ -13,6 +16,9 @@ class DashApp : Application() {
         Prefs.init(this)
         StyleRepo.init(this)
         AppsRepo.init(this)
+        Dashcam.init(this)
+        HomeRepo.init(this)
+        WidgetHost.init(this)
 
         // osmdroid: identificación ante los servidores de mapas y caché de mosaicos en la app.
         Configuration.getInstance().apply {

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="split_desc">Permite que L200 Dash ponga Waze en pantalla dividida junto al tablero cuando tocas \"Waze dividido\". No lee el contenido de la pantalla.</string>
+</resources>

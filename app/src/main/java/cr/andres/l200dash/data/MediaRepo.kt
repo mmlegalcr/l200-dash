@@ -1,6 +1,9 @@
 package cr.andres.l200dash.data
 
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.AudioManager
@@ -69,6 +72,27 @@ object MediaRepo {
     private var listening = false
     private lateinit var appCtx: Context
 
+    /** Cantidad de sesiones multimedia visibles (diagnóstico). -1 = sin acceso. */
+    private val _sessions = MutableStateFlow(-1)
+    val sessions: StateFlow<Int> = _sessions
+
+    // ---- Respaldo sin permiso: muchas apps anuncian la canción por broadcast.
+    // Spotify lo hace si se activa "Estado de transmisión del dispositivo" en sus ajustes.
+    private var receiverRegistered = false
+    private var broadcastNow: NowPlaying? = null
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            intent?.let { handleBroadcast(it) }
+        }
+    }
+    private val BROADCAST_ACTIONS = listOf(
+        "com.spotify.music.metadatachanged", "com.spotify.music.playbackstatechanged",
+        "com.android.music.metachanged", "com.android.music.playstatechanged",
+        "com.android.music.playbackcomplete", "com.miui.player.metachanged",
+        "com.sec.android.app.music.metachanged", "com.htc.music.metachanged",
+        "com.amazon.mp3.metachanged", "com.andrew.apollo.metachanged"
+    )
+
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list ->
         pick(list ?: emptyList())
     }
@@ -84,6 +108,7 @@ object MediaRepo {
 
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
+        registerBroadcasts()
         val granted = NotificationManagerCompat.getEnabledListenerPackages(appCtx).contains(appCtx.packageName)
         _hasAccess.value = granted
         if (!granted) return
@@ -98,7 +123,61 @@ object MediaRepo {
             pick(manager.getActiveSessions(cn))
         } catch (_: SecurityException) {
             _hasAccess.value = false
+            _sessions.value = -1
         }
+    }
+
+    private fun registerBroadcasts() {
+        if (receiverRegistered) return
+        val f = IntentFilter()
+        BROADCAST_ACTIONS.forEach { f.addAction(it) }
+        try {
+            appCtx.registerReceiver(receiver, f)
+            receiverRegistered = true
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun num(i: Intent, vararg keys: String): Long? {
+        val ex = i.extras ?: return null
+        for (k in keys) {
+            @Suppress("DEPRECATION")
+            val v = ex.get(k)
+            if (v is Number) return v.toLong()
+        }
+        return null
+    }
+
+    private fun handleBroadcast(i: Intent) {
+        val action = i.action ?: return
+        val cur = broadcastNow
+        val now = SystemClock.elapsedRealtime()
+        val pkg = when {
+            action.startsWith("com.spotify") -> "com.spotify.music"
+            else -> i.getStringExtra("package") ?: cur?.pkg ?: ""
+        }
+        val base = cur ?: NowPlaying("", "", "", null, false, pkg, 0L, 0L, now, 1f)
+        broadcastNow = if (action.endsWith("metadatachanged") || action.endsWith("metachanged")) {
+            base.copy(
+                title = i.getStringExtra("track") ?: i.getStringExtra("title") ?: base.title,
+                artist = i.getStringExtra("artist") ?: base.artist,
+                album = i.getStringExtra("album") ?: base.album,
+                pkg = pkg,
+                durationMs = num(i, "length", "duration") ?: base.durationMs,
+                positionMs = if (cur?.title != i.getStringExtra("track")) 0L else base.positionMs,
+                positionAt = now,
+                playing = if (i.hasExtra("playing")) i.getBooleanExtra("playing", false) else base.playing
+            )
+        } else {
+            base.copy(
+                pkg = pkg,
+                playing = i.getBooleanExtra("playing", base.playing),
+                positionMs = num(i, "playbackPosition", "position") ?: base.positionMs,
+                positionAt = now
+            )
+        }
+        // Si hay una sesión multimedia con acceso, esa manda; el broadcast es solo respaldo.
+        if (controller == null) _now.value = broadcastNow
     }
 
     private fun refreshSessions() {
@@ -111,6 +190,7 @@ object MediaRepo {
 
     /** Prefiere la sesión que está sonando; si ninguna, Spotify; si no, la primera. */
     private fun pick(list: List<MediaController>) {
+        _sessions.value = list.size
         val chosen = list.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             ?: list.firstOrNull { it.packageName == "com.spotify.music" }
             ?: list.firstOrNull()
@@ -125,7 +205,7 @@ object MediaRepo {
     private fun publish() {
         val c = controller
         if (c == null) {
-            _now.value = null
+            _now.value = broadcastNow
             return
         }
         val md = c.metadata

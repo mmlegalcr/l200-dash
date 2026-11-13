@@ -111,19 +111,18 @@ fun MusicPanel(modifier: Modifier = Modifier) {
                     } else if (!access) {
                         Text(
                             "Permitir acceso ›", color = l.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable {
-                                try {
-                                    ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                } catch (_: ActivityNotFoundException) {
-                                    Toast.makeText(ctx, "Esta pantalla no tiene ese ajuste", Toast.LENGTH_LONG).show()
-                                }
-                            }
+                            modifier = Modifier.clickable { openNotificationAccess(ctx) }
                         )
                     }
                 }
             }
 
-            Equalizer(playing, Modifier.fillMaxWidth().height(34.dp))
+            Equalizer(playing, Modifier.fillMaxWidth().height(30.dp))
+            val sessions by MediaRepo.sessions.collectAsState()
+            Text(
+                if (access) "Acceso: sí · sesiones activas: ${sessions.coerceAtLeast(0)}" else "Acceso: no · usando avisos de las apps",
+                color = l.dim, fontSize = 10.sp
+            )
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
                 SquareButton(Icons.Filled.SkipPrevious, 42.dp) { MediaRepo.previous(ctx) }
@@ -132,6 +131,29 @@ fun MusicPanel(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/** Abre la pantalla de "Acceso a notificaciones" probando varias rutas (cada fabricante la esconde distinto). */
+fun openNotificationAccess(ctx: android.content.Context) {
+    val attempts = listOf(
+        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+        Intent("android.settings.NOTIFICATION_LISTENER_SETTINGS"),
+        Intent().setClassName("com.android.settings", "com.android.settings.Settings\$NotificationAccessSettingsActivity"),
+        Intent().setClassName("com.android.settings", "com.android.settings.Settings\$AppAndNotificationDashboardActivity"),
+        Intent(Settings.ACTION_SETTINGS)
+    )
+    for (i in attempts) {
+        try {
+            ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            if (i.action == Settings.ACTION_SETTINGS) {
+                Toast.makeText(ctx, "Busca: Apps y notificaciones → Acceso especial → Acceso a notificaciones → L200 Dash", Toast.LENGTH_LONG).show()
+            }
+            return
+        } catch (_: ActivityNotFoundException) {
+        } catch (_: SecurityException) {
+        }
+    }
+    Toast.makeText(ctx, "Esta pantalla no tiene ese ajuste", Toast.LENGTH_LONG).show()
 }
 
 private fun fmt(ms: Long): String {

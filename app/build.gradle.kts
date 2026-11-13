@@ -3,21 +3,46 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Firma permanente: el workflow escribe el keystore desde los secretos de GitHub.
+val ksFile = System.getenv("KEYSTORE_FILE")?.let { file(it) }
+val mapsKey: String = System.getenv("MAPS_API_KEY") ?: ""
+
 android {
     namespace = "cr.andres.l200dash"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "cr.andres.l200dash"
+        // Mismo paquete que la app de la dashcam: Android solo deja usar la carpeta de
+        // comandos de la cámara (Android/data/com.fvision.camera) a la app con ese nombre.
+        applicationId = "com.fvision.camera"
         minSdk = 26
         targetSdk = 29
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 300
+        versionName = "0.3"
+        manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+        buildConfigField("boolean", "HAS_MAPS_KEY", if (mapsKey.isNotBlank()) "true" else "false")
+
+        // La librería de la dashcam solo existe en 32 bits.
+        ndk {
+            abiFilters += "armeabi-v7a"
+        }
+    }
+
+    signingConfigs {
+        create("perm") {
+            if (ksFile != null && ksFile.exists()) {
+                storeFile = ksFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (ksFile != null && ksFile.exists()) signingConfigs.getByName("perm") else signingConfigs.getByName("debug")
         }
     }
 
@@ -32,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -40,6 +66,7 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        jniLibs.useLegacyPackaging = true
     }
 
     lint {
@@ -62,4 +89,5 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation("com.google.android.gms:play-services-maps:19.0.0")
 }

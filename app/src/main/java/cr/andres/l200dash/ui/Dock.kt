@@ -43,29 +43,46 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cr.andres.l200dash.data.AppsRepo
+import cr.andres.l200dash.data.HomeRepo
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val ES = Locale("es", "CR")
 
-/** Accesos del dock. pkg == null => acción interna. */
-data class DockItem(val label: String, val icon: ImageVector, val pkg: String?)
-
-val DOCK_ITEMS = listOf(
-    DockItem("Waze", Icons.Filled.Navigation, "com.waze"),
-    DockItem("Spotify", Icons.Filled.MusicNote, "com.spotify.music"),
-    DockItem("Dashcam", Icons.Filled.Videocam, "com.fvision.camera"),
-    DockItem("Teléfono", Icons.Filled.Phone, "com.tw.bt"),
-    DockItem("Radio", Icons.Filled.Radio, "com.tw.radio"),
-    DockItem("Ajustes", Icons.Filled.Settings, "com.dofun.carsetting"),
-    DockItem("Apps", Icons.Filled.Apps, null)
+/** Íconos de línea para apps conocidas; las demás usan su ícono real. */
+private val KNOWN_ICONS: Map<String, Pair<String, ImageVector>> = mapOf(
+    "com.waze" to ("Waze" to Icons.Filled.Navigation),
+    "com.spotify.music" to ("Spotify" to Icons.Filled.MusicNote),
+    "com.fvision.camera" to ("Dashcam" to Icons.Filled.Videocam),
+    "com.tw.bt" to ("Teléfono" to Icons.Filled.Phone),
+    "com.tw.radio" to ("Radio" to Icons.Filled.Radio),
+    "com.dofun.carsetting" to ("Ajustes" to Icons.Filled.Settings),
+    HomeRepo.APPS_BUTTON to ("Apps" to Icons.Filled.Apps)
 )
 
 @Composable
-fun Dock(now: LocalDateTime, onOpenDrawer: () -> Unit, onCustomize: () -> Unit, modifier: Modifier = Modifier) {
+fun Dock(
+    now: LocalDateTime,
+    editing: Boolean,
+    onOpenDrawer: () -> Unit,
+    onCustomize: () -> Unit,
+    onAddToDock: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val l = LocalLook.current
     val ctx = LocalContext.current
+    val layout by HomeRepo.layout.collectAsState()
     val shape = RoundedCornerShape(l.radius)
     Row(
         modifier
@@ -76,14 +93,41 @@ fun Dock(now: LocalDateTime, onOpenDrawer: () -> Unit, onCustomize: () -> Unit, 
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(Modifier.width(220.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.width(200.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(now.format(DateTimeFormatter.ofPattern("H:mm")), color = l.text, fontSize = 30.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.width(10.dp))
             Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM", ES)), color = l.dim, fontSize = 12.sp)
         }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
-            DOCK_ITEMS.forEach { item ->
-                DockButton(item) { if (item.pkg == null) onOpenDrawer() else AppsRepo.launch(ctx, item.pkg) }
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            layout.dock.forEach { pkg ->
+                Box {
+                    DockButton(pkg) {
+                        when {
+                            editing -> Unit
+                            pkg == HomeRepo.APPS_BUTTON -> onOpenDrawer()
+                            pkg == ctx.packageName -> onOpenDrawer()
+                            else -> AppsRepo.launch(ctx, pkg)
+                        }
+                    }
+                    if (editing && pkg != HomeRepo.APPS_BUTTON) {
+                        Box(
+                            Modifier.align(Alignment.TopStart).size(24.dp).clip(CircleShape).background(l.rec)
+                                .clickable { HomeRepo.dockRemove(pkg) },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Filled.Close, "Quitar", tint = Color.White, modifier = Modifier.size(14.dp)) }
+                    }
+                }
+            }
+            if (editing) {
+                Box(
+                    Modifier.size(width = 58.dp, height = 58.dp).clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, l.accent, RoundedCornerShape(10.dp)).clickable(onClick = onAddToDock),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Filled.Add, "Agregar al dock", tint = l.accent) }
             }
         }
         Row(Modifier.width(220.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
@@ -98,9 +142,12 @@ fun Dock(now: LocalDateTime, onOpenDrawer: () -> Unit, onCustomize: () -> Unit, 
 }
 
 @Composable
-private fun DockButton(item: DockItem, onClick: () -> Unit) {
+private fun DockButton(pkg: String, onClick: () -> Unit) {
     val l = LocalLook.current
     val shape = RoundedCornerShape(10.dp)
+    val known = KNOWN_ICONS[pkg]
+    val appIcon = remember(pkg) { if (known == null) AppsRepo.loadIcon(pkg) else null }
+    val label = known?.first ?: remember(pkg) { AppsRepo.labelOf(pkg) }
     Column(
         Modifier
             .size(width = 76.dp, height = 58.dp)
@@ -111,9 +158,13 @@ private fun DockButton(item: DockItem, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(item.icon, null, tint = l.accent, modifier = Modifier.size(22.dp))
+        when {
+            known != null -> Icon(known.second, null, tint = l.accent, modifier = Modifier.size(22.dp))
+            appIcon != null -> Image(appIcon, null, Modifier.size(24.dp))
+            else -> Box(Modifier.size(22.dp))
+        }
         Spacer(Modifier.size(3.dp))
-        Text(item.label, color = l.text, fontSize = 11.sp, maxLines = 1)
+        Text(label, color = l.text, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

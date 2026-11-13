@@ -1,14 +1,18 @@
-# L200 Dash v0.2
+# L200 Dash v0.3
 
 Launcher propio para la pantalla Android (TS18 · Android 10) de la L200.
+Paquete: com.fvision.camera (necesario para controlar la dashcam USB).
 
-- Diseño de paneles oscuros con borde de acento y brillo, ilustración de la L200 al centro
-- Medidores: brújula, velocidad y altímetro (GPS)
-- Mapa en vivo (OpenStreetMap: relieve o calles) + indicaciones de Waze leídas de su notificación
-- Cámara en vivo (Camera2; reversa = id 1), se reconecta sola
-- Música (Spotify u otra) con portada, tiempo, ecualizador y controles
-- Dock con accesos, volumen del sistema y botón Personalizar
-- Personalizar: color de acento, fondo y opacidad de paneles, brillo/grosor/esquinas del borde,
-  tamaño de texto, imagen central propia, estilos separados para día y noche, temas guardados
+- Inicio editable estilo Nova: páginas, cuadrícula, mover / cambiar tamaño / quitar,
+  widgets propios (mapa, cámara, música, medidores, velocímetro, reloj, clima, Waze),
+  apps, carpetas, widgets de Android, dock editable, cajón con búsqueda y apps ocultas
+- Dashcam integrada: video en vivo, grabar, guardar clip, foto, micrófono, hora automática
+- Mapa: Google Maps con tráfico (secreto MAPS_API_KEY) o CARTO / relieve sin key
+- Waze en pantalla dividida (servicio de accesibilidad) + tablero compacto
+- Personalizar: colores, borde, brillo, texto, imagen central, día/noche, temas, cuadrícula
 
-El APK lo compila GitHub Actions al subir cambios a `main` y queda en Releases (`L200Dash.apk`).
+Build: GitHub Actions firma con los secretos KEYSTORE_BASE64, KEYSTORE_PASSWORD,
+KEY_ALIAS, KEY_PASSWORD y agrega MAPS_API_KEY. El APK queda en Releases (L200Dash.apk).
+
+Nota: incluye la librería nativa de la dashcam (libuvccamera-lib.so). Uso personal:
+mantener este repositorio privado.

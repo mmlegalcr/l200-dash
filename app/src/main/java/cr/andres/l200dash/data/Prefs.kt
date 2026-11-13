@@ -9,13 +9,23 @@ import kotlinx.coroutines.flow.StateFlow
 object Prefs {
     private lateinit var sp: SharedPreferences
 
-    /** Id Camera2 que muestra el widget de cámara. En esta pantalla, "1" es la de reversa. */
-    private val _cameraId = MutableStateFlow("1")
+    /** Fuente del widget de cámara: "dash" = dashcam USB; si no, id Camera2 ("1" = reversa). */
+    private val _cameraId = MutableStateFlow("dash")
     val cameraId: StateFlow<String> = _cameraId
+
+    /** Proveedor del mapa: google, carto_dark, carto_light, topo. */
+    private val _mapProvider = MutableStateFlow("google")
+    val mapProvider: StateFlow<String> = _mapProvider
+
+    fun setMapProvider(p: String) {
+        _mapProvider.value = p
+        sp.edit().putString("map_provider", p).apply()
+    }
 
     fun init(ctx: Context) {
         sp = ctx.getSharedPreferences("dash", Context.MODE_PRIVATE)
-        _cameraId.value = sp.getString("camera_id", "1") ?: "1"
+        _cameraId.value = sp.getString("camera_id", "dash") ?: "dash"
+        _mapProvider.value = sp.getString("map_provider", "google") ?: "google"
     }
 
     fun setCameraId(id: String) {

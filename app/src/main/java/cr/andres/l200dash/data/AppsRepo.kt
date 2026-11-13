@@ -68,6 +68,19 @@ object AppsRepo {
         return bmp
     }
 
+    private val labelCache = HashMap<String, String>()
+
+    /** Nombre visible de una app (con caché). */
+    @Synchronized
+    fun labelOf(pkg: String): String = labelCache.getOrPut(pkg) {
+        try {
+            val pm = appCtx.packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: Exception) {
+            pkg.substringAfterLast('.')
+        }
+    }
+
     fun isInstalled(pkg: String): Boolean = try {
         appCtx.packageManager.getPackageInfo(pkg, 0)
         true
