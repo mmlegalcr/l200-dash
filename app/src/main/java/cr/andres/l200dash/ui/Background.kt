@@ -85,6 +85,7 @@ fun DashBackground(hero: Hero?, brightness: Float, modifier: Modifier = Modifier
     BoxWithConstraints(modifier.fillMaxSize().background(Brush.verticalGradient(stops))) {
         if (hero != null) {
             val w = maxWidth * 0.62f
+            val top = maxHeight * 0.26f
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 Image(
                     bitmap = hero.image,
@@ -93,7 +94,7 @@ fun DashBackground(hero: Hero?, brightness: Float, modifier: Modifier = Modifier
                     colorFilter = filter,
                     modifier = Modifier
                         .width(w)
-                        .offset(y = maxHeight * 0.26f)
+                        .offset(y = top)
                         .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                         .drawWithContent {
                             drawContent()
