@@ -56,11 +56,8 @@ class MainActivity : ComponentActivity() {
         if (needed.isNotEmpty()) requestPermissions(needed.toTypedArray(), 10)
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        LocationRepo.start(this)
-    }
+    // No hace falta onRequestPermissionsResult: al cerrar el diálogo de permisos la
+    // actividad vuelve a onResume(), que arranca el GPS.
 
     @Composable
     private fun DashRoot() {
@@ -127,3 +124,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
